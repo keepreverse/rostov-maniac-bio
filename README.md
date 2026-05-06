@@ -1,7 +1,7 @@
 # ROSTOV MANIAC — CS2 Player Card
 
 Interactive bio-link / business-card webpage for Counter-Strike 2 player **ROSTOV MANIAC**
-(Steam: [`euphoriaohilia`](https://steamcommunity.com/id/bbqb), SteamID64
+(Steam: [`euphoriaohilia`](https://steamcommunity.com/profile/76561198055425103), SteamID64
 `76561198055425103`), themed around Ukrainian national identity (flag colors, Tryzub) and
 CS2 HUD aesthetics.
 

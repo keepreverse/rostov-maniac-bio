@@ -200,7 +200,7 @@ img, svg, object { max-width: 100%; height: auto; display: block; }
   container-type: inline-size;
   container-name: card;
   position: relative; z-index: 2;
-  width: min(100%, 75rem);
+  width: min(100%, 90rem);
   margin-inline: auto;
   margin-block: clamp(3.5rem, 8vw, 5rem) clamp(4rem, 10vw, 6rem);
   padding: var(--space-4) clamp(0.75rem, 3vw, 2.5rem);
