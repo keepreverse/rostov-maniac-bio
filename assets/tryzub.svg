@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" role="img" aria-label="Ukrainian Tryzub">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFE34D"/>
+      <stop offset="100%" stop-color="#FFB800"/>
+    </linearGradient>
+    <linearGradient id="gline" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD500"/>
+      <stop offset="100%" stop-color="#005BBB"/>
+    </linearGradient>
+  </defs>
+  <!--
+    Stylised Tryzub (Ukrainian coat of arms).
+    Drawn from a centered, symmetric path so it scales cleanly.
+  -->
+  <g fill="url(#g)" stroke="url(#gline)" stroke-width="2" stroke-linejoin="round">
+    <path d="
+      M100 8
+      L112 8
+      L112 78
+      L132 78
+      L132 32
+      L150 32
+      L150 110
+      Q150 138 124 152
+      L124 188
+      L138 188
+      L138 200
+      L62 200
+      L62 188
+      L76 188
+      L76 152
+      Q50 138 50 110
+      L50 32
+      L68 32
+      L68 78
+      L88 78
+      L88 8
+      L100 8
+      Z
+    "/>
+    <!-- bottom dagger / pidkova -->
+    <path d="
+      M86 200
+      L100 232
+      L114 200
+      Z
+    "/>
+    <!-- inner cuts to give classic Tryzub silhouette -->
+    <path d="M94 28 L106 28 L106 92 L94 92 Z" fill="#0a1428" stroke="none"/>
+    <path d="M58 50 L70 50 L70 96 L58 96 Z" fill="#0a1428" stroke="none"/>
+    <path d="M130 50 L142 50 L142 96 L130 96 Z" fill="#0a1428" stroke="none"/>
+  </g>
+</svg>
