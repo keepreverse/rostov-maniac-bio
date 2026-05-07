@@ -18,39 +18,52 @@
      1) Baseline effects that should run regardless of API state
      ==================================================================== */
 
-  /* HUD clock (Kyiv time) */
+  /* HUD clock (Kyiv time) — cached formatter avoids toLocaleString overhead */
   const clockEl = document.getElementById("hudClock");
+  const clockFmt = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    timeZone: "Europe/Kyiv", hour12: false,
+  });
   const tickClock = () => {
-    const now = new Date();
-    const kyiv = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Kyiv" }));
-    const pad = (n) => String(n).padStart(2, "0");
-    clockEl.textContent = `${pad(kyiv.getHours())}:${pad(kyiv.getMinutes())}:${pad(kyiv.getSeconds())} EET`;
+    clockEl.textContent = clockFmt.format(new Date()) + " EET";
   };
   if (clockEl) { tickClock(); setInterval(tickClock, 1000); }
 
-  /* Mouse parallax on Tryzub watermark */
+  /* Mouse parallax on Tryzub watermark — idles when mouse is stationary */
   const tryzub = document.querySelector(".bg-tryzub");
   if (tryzub && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     let tx = 0, ty = 0, cx = 0, cy = 0;
+    let parallaxRunning = false;
+    const startParallax = () => {
+      if (parallaxRunning) return;
+      parallaxRunning = true;
+      const loop = () => {
+        cx += (tx - cx) * 0.05;
+        cy += (ty - cy) * 0.05;
+        tryzub.style.transform = `translate(calc(-50% + ${cx}px), calc(-50% + ${cy}px))`;
+        if (Math.abs(tx - cx) > 0.05 || Math.abs(ty - cy) > 0.05) {
+          requestAnimationFrame(loop);
+        } else {
+          cx = tx; cy = ty;
+          parallaxRunning = false;
+        }
+      };
+      requestAnimationFrame(loop);
+    };
     window.addEventListener("mousemove", (e) => {
       tx = (e.clientX / window.innerWidth - 0.5) * 24;
       ty = (e.clientY / window.innerHeight - 0.5) * 24;
+      startParallax();
     }, { passive: true });
-    const loop = () => {
-      cx += (tx - cx) * 0.05;
-      cy += (ty - cy) * 0.05;
-      tryzub.style.transform = `translate(calc(-50% + ${cx}px), calc(-50% + ${cy}px))`;
-      requestAnimationFrame(loop);
-    };
-    loop();
   }
 
-  /* Particle field */
+  /* Particle field — offscreen sprite cache eliminates per-frame shadowBlur */
   const canvas = document.getElementById("particles");
   if (canvas && canvas.getContext) {
     const ctx = canvas.getContext("2d");
     let w, h, particles, dpr;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const TWO_PI = Math.PI * 2;
 
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -64,19 +77,38 @@
     };
     resize();
 
+    /* Pre-render glow sprites to offscreen canvases (one per color). */
     const COLORS = ["rgba(255,213,0,0.85)", "rgba(0,91,187,0.85)", "rgba(255,255,255,0.6)"];
+    const SPRITE_R = 10;
+    const spriteCache = COLORS.map((c) => {
+      const s = document.createElement("canvas");
+      const sz = (SPRITE_R + 8) * 2;
+      s.width = sz; s.height = sz;
+      const sc = s.getContext("2d");
+      sc.shadowBlur = 8;
+      sc.shadowColor = c;
+      sc.fillStyle = c;
+      sc.beginPath();
+      sc.arc(sz / 2, sz / 2, SPRITE_R, 0, TWO_PI);
+      sc.fill();
+      return s;
+    });
+
     const count = reduce ? 0 : Math.min(120, Math.floor((w * h) / 16000));
 
-    particles = Array.from({ length: count }, () => ({
-      x: Math.random() * w,
-      y: Math.random() * h,
-      r: Math.random() * 1.6 + 0.4,
-      vx: (Math.random() - 0.5) * 0.25,
-      vy: -(Math.random() * 0.5 + 0.1),
-      c: COLORS[Math.floor(Math.random() * COLORS.length)],
-      a: Math.random() * Math.PI * 2,
-      s: 0.005 + Math.random() * 0.01,
-    }));
+    particles = Array.from({ length: count }, () => {
+      const ci = Math.floor(Math.random() * COLORS.length);
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 1.6 + 0.4,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: -(Math.random() * 0.5 + 0.1),
+        ci,
+        a: Math.random() * TWO_PI,
+        s: 0.005 + Math.random() * 0.01,
+      };
+    });
 
     const draw = () => {
       ctx.clearRect(0, 0, w, h);
@@ -88,18 +120,20 @@
         if (p.x < -10) p.x = w + 10;
         if (p.x > w + 10) p.x = -10;
 
-        ctx.beginPath();
-        ctx.fillStyle = p.c;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = p.c;
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
+        const sprite = spriteCache[p.ci];
+        const scale = p.r / SPRITE_R;
+        const sz = sprite.width * scale;
+        ctx.drawImage(sprite, p.x - sz / 2, p.y - sz / 2, sz, sz);
       }
       requestAnimationFrame(draw);
     };
     if (count > 0) draw();
 
-    window.addEventListener("resize", resize);
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(resize, 150);
+    });
   }
 
   /* Subtle tilt — bound after render too, so we re-bind on dynamic tiles */
@@ -145,6 +179,20 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  /* Pre-cache data-bind / data-bind-bar DOM lookups for hot paths. */
+  const _bindCache = new Map();
+  const _barCache = new Map();
+  const getBindEls = (key) => {
+    let els = _bindCache.get(key);
+    if (!els) { els = $$(`[data-bind="${key}"]`); _bindCache.set(key, els); }
+    return els;
+  };
+  const getBarEls = (key) => {
+    let els = _barCache.get(key);
+    if (!els) { els = $$(`[data-bind-bar="${key}"]`); _barCache.set(key, els); }
+    return els;
+  };
+
   const fmt = {
     int: (n) => Math.round(Number(n)).toLocaleString("en-US"),
     intpct: (n) => `${Math.round(Number(n))}%`,
@@ -189,23 +237,24 @@
     if (value == null || isNaN(value)) return;
     const max = BAR_MAX[key] || 100;
     const pct = Math.max(2, Math.min(100, (Number(value) / max) * 100));
-    $$(`[data-bind-bar="${key}"]`).forEach((el) => {
-      el.style.setProperty("--p", `${pct.toFixed(1)}%`);
+    const pctStr = `${pct.toFixed(1)}%`;
+    getBarEls(key).forEach((el) => {
+      el.style.setProperty("--p", pctStr);
     });
   };
 
+  const NUMERIC_FMTS = new Set(["int", "intpct", "intms", "dec1", "dec1pct", "dec2"]);
   const setText = (key, raw, formatter = "raw") => {
-    $$(`[data-bind="${key}"]`).forEach((el) => {
-      const v = (raw == null) ? "—" : (fmt[formatter] ? fmt[formatter](raw) : String(raw));
+    const v = (raw == null) ? "—" : (fmt[formatter] ? fmt[formatter](raw) : String(raw));
+    const isNumeric = typeof raw === "number" && NUMERIC_FMTS.has(formatter);
+    getBindEls(key).forEach((el) => {
       // Counter animations key off [data-counter]; convert numeric values
       // when the formatter is one of the numeric ones.
-      if (typeof raw === "number" && ["int", "intpct", "intms", "dec1", "dec1pct", "dec2"].includes(formatter)) {
+      if (isNumeric) {
         el.dataset.counter = String(raw);
         el.dataset.fmtMode = formatter;
-        el.textContent = v;
-      } else {
-        el.textContent = v;
       }
+      el.textContent = v;
     });
   };
 
@@ -213,6 +262,7 @@
     const list = $('[data-bind="last10"]');
     if (!list) return;
     list.innerHTML = "";
+    const frag = document.createDocumentFragment();
     let wins = 0, losses = 0, ties = 0;
     last10.forEach((m) => {
       if (m.outcome === "win") wins += 1;
@@ -235,8 +285,9 @@
         ? `https://leetify.com/app/match-details/${encodeURIComponent(m.id)}`
         : `https://leetify.com/app/profile/76561198055425103#match-history`;
       li.appendChild(a);
-      list.appendChild(li);
+      frag.appendChild(li);
     });
+    list.appendChild(frag);
     const summaryEl = $('[data-bind="last10Summary"]');
     if (summaryEl) {
       summaryEl.textContent = ties > 0
@@ -249,6 +300,7 @@
     const grid = $('[data-bind="mapPool"]');
     if (!grid) return;
     grid.innerHTML = "";
+    const frag = document.createDocumentFragment();
     const RANK_MAX = 18;
     const sorted = [...mapPool].sort((a, b) => b.rank - a.rank);
     const top = sorted[0];
@@ -274,8 +326,9 @@
         <div class="weapon__bar"><i style="--p: ${pct.toFixed(1)}%"></i></div>
         <span class="weapon__float">${tier.floatLabel}</span>
       `;
-      grid.appendChild(a);
+      frag.appendChild(a);
     });
+    grid.appendChild(frag);
     bindTilt(grid);
   };
 
